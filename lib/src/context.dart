@@ -8,6 +8,7 @@ import 'package:flutterpi_tool/src/config.dart';
 import 'package:flutterpi_tool/src/devices/device_manager.dart';
 import 'package:flutterpi_tool/src/devices/flutterpi_ssh/ssh_utils.dart';
 import 'package:unified_analytics/unified_analytics.dart';
+import 'package:github/github.dart' as gh;
 import 'package:http/io_client.dart' as http;
 
 import 'package:flutterpi_tool/src/cache.dart';
@@ -19,6 +20,51 @@ import 'package:flutterpi_tool/src/more_os_utils.dart';
 // ignore: implementation_imports
 import 'package:flutter_tools/src/context_runner.dart' as fl;
 
+FlutterpiCache _createCache() {
+  final env = io.Platform.environment;
+  final repoStr = env['FLUTTERPI_ARTIFACTS_REPO'];
+  final runId = env['FLUTTERPI_ARTIFACTS_RUNID'];
+  final tokenStr = env['GITHUB_TOKEN'];
+
+  final repo = repoStr != null ? gh.RepositorySlug.full(repoStr) : null;
+
+  final github = MyGithub.caching(
+    httpClient: http.IOClient(
+      globals.httpClientFactory?.call() ?? io.HttpClient(),
+    ),
+    auth: tokenStr != null
+        ? gh.Authentication.bearerToken(tokenStr)
+        : null,
+  );
+
+  if (runId != null) {
+    return FlutterpiCache.fromWorkflow(
+      hooks: globals.shutdownHooks,
+      logger: globals.logger,
+      fileSystem: globals.fs,
+      platform: globals.platform,
+      osUtils: globals.os as MoreOperatingSystemUtils,
+      projectFactory: globals.projectFactory,
+      processManager: globals.processManager,
+      github: github,
+      repo: repo,
+      runId: runId,
+    );
+  }
+
+  return FlutterpiCache(
+    hooks: globals.shutdownHooks,
+    logger: globals.logger,
+    fileSystem: globals.fs,
+    platform: globals.platform,
+    osUtils: globals.os as MoreOperatingSystemUtils,
+    projectFactory: globals.projectFactory,
+    processManager: globals.processManager,
+    github: github,
+    repo: repo,
+  );
+}
+
 Future<V> runInContext<V>(
   FutureOr<V> Function() fn, {
   bool verbose = false,
@@ -28,20 +74,7 @@ Future<V> runInContext<V>(
     overrides: {
       Analytics: () => const NoOpAnalytics(),
       fl.TemplateRenderer: () => const fl.MustacheTemplateRenderer(),
-      fl.Cache: () => FlutterpiCache(
-            hooks: globals.shutdownHooks,
-            logger: globals.logger,
-            fileSystem: globals.fs,
-            platform: globals.platform,
-            osUtils: globals.os as MoreOperatingSystemUtils,
-            projectFactory: globals.projectFactory,
-            processManager: globals.processManager,
-            github: MyGithub.caching(
-              httpClient: http.IOClient(
-                globals.httpClientFactory?.call() ?? io.HttpClient(),
-              ),
-            ),
-          ),
+      fl.Cache: _createCache,
       fl.OperatingSystemUtils: () => MoreOperatingSystemUtils(
             fileSystem: globals.fs,
             logger: globals.logger,

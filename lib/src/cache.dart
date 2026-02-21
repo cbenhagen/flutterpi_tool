@@ -675,14 +675,24 @@ mixin FlutterpiCacheMixin on Cache implements FlutterpiCache {
 
   late final ArtifactUpdater _updater = createUpdater();
 
-  List<String> get allowedBaseUrls => [
-        cipdBaseUrl,
-        storageBaseUrl,
-        'https://github.com/ardera/flutter-pi/',
-        'https://github.com/ardera/flutter-ci/',
-        'https://api.github.com/repos/ardera/flutter-pi/',
-        'https://api.github.com/repos/ardera/flutter-ci/',
-      ];
+  List<String> get allowedBaseUrls {
+    final urls = [
+      cipdBaseUrl,
+      storageBaseUrl,
+      'https://github.com/ardera/flutter-pi/',
+      'https://github.com/ardera/flutter-ci/',
+      'https://api.github.com/repos/ardera/flutter-pi/',
+      'https://api.github.com/repos/ardera/flutter-ci/',
+    ];
+    final customRepo = io.Platform.environment['FLUTTERPI_ARTIFACTS_REPO'];
+    if (customRepo != null) {
+      urls.addAll([
+        'https://github.com/$customRepo/',
+        'https://api.github.com/repos/$customRepo/',
+      ]);
+    }
+    return urls;
+  }
 
   /// This has to be lazy because it requires FLUTTER_ROOT to be initialized.
   @protected
